@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Workflow } from "@shared/schema";
+import JobSchedulerModal from "./job-scheduler-modal";
 import {
   Download,
   Upload,
@@ -23,14 +25,11 @@ export default function WorkflowToolbar({
   onImport, 
   currentWorkflow 
 }: WorkflowToolbarProps) {
+  const [showJobScheduler, setShowJobScheduler] = useState(false);
+
   const handleValidateWorkflow = () => {
     // Basic workflow validation logic
     console.log("Validating workflow...");
-  };
-
-  const handleRunWorkflow = () => {
-    // Workflow execution logic
-    console.log("Running workflow...");
   };
 
   return (
@@ -70,11 +69,23 @@ export default function WorkflowToolbar({
           <CheckCircle className="w-4 h-4 mr-2" />
           Validate
         </Button>
-        <Button size="sm" onClick={handleRunWorkflow}>
+        <Button 
+          size="sm" 
+          onClick={() => setShowJobScheduler(true)}
+          disabled={!currentWorkflow}
+        >
           <Play className="w-4 h-4 mr-2" />
           Run Workflow
         </Button>
       </div>
+
+      {/* Job Scheduler Modal */}
+      {showJobScheduler && currentWorkflow && (
+        <JobSchedulerModal
+          workflow={currentWorkflow}
+          onClose={() => setShowJobScheduler(false)}
+        />
+      )}
     </div>
   );
 }

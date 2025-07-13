@@ -1,4 +1,4 @@
-import { workflows, users, type Workflow, type InsertWorkflow, type User, type InsertUser } from "@shared/schema";
+import { workflows, users, jobs, type Workflow, type InsertWorkflow, type User, type InsertUser, type Job, type InsertJob } from "@shared/schema";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -11,19 +11,31 @@ export interface IStorage {
   createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
   updateWorkflow(id: number, workflow: Partial<InsertWorkflow>): Promise<Workflow | undefined>;
   deleteWorkflow(id: number): Promise<boolean>;
+  
+  // Job operations
+  getJob(id: number): Promise<Job | undefined>;
+  getAllJobs(): Promise<Job[]>;
+  getJobsByWorkflow(workflowId: number): Promise<Job[]>;
+  createJob(job: InsertJob): Promise<Job>;
+  updateJob(id: number, job: Partial<InsertJob> & { status?: string; lastRunAt?: Date | null }): Promise<Job | undefined>;
+  deleteJob(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private workflows: Map<number, Workflow>;
+  private jobs: Map<number, Job>;
   private currentUserId: number;
   private currentWorkflowId: number;
+  private currentJobId: number;
 
   constructor() {
     this.users = new Map();
     this.workflows = new Map();
+    this.jobs = new Map();
     this.currentUserId = 1;
     this.currentWorkflowId = 1;
+    this.currentJobId = 1;
     
     // Initialize with some sample workflows
     this.initializeSampleData();
@@ -145,6 +157,88 @@ export class MemStorage implements IStorage {
 
   async deleteWorkflow(id: number): Promise<boolean> {
     return this.workflows.delete(id);
+  }
+
+  // Job operations
+  async getJob(id: number): Promise<Job | undefined> {
+    return this.jobs.get(id);
+  }
+
+  async getAllJobs(): Promise<Job[]> {
+    return Array.from(this.jobs.values()).sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async getJobsByWorkflow(workflowId: number): Promise<Job[]> {
+    return Array.from(this.jobs.values())
+      .filter(job => job.workflowId === workflowId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    const id = this.currentJobId++;
+    const now = new Date();
+    
+    // Calculate next run time based on schedule
+    let nextRunAt: Date | null = null;
+    const config = job.scheduleConfig as any;
+    if (job.scheduleType === 'once' && config?.executeAt) {
+      nextRunAt = new Date(config.executeAt);
+    } else if (job.scheduleType === 'recurring') {
+      nextRunAt = this.calculateNextRun(config);
+    }
+
+    const newJob: Job = {
+      ...job,
+      id,
+      status: job.status || 'pending',
+      description: job.description || null,
+      createdAt: now,
+      updatedAt: now,
+      lastRunAt: null,
+      nextRunAt,
+    };
+    this.jobs.set(id, newJob);
+    return newJob;
+  }
+
+  async updateJob(id: number, job: Partial<InsertJob> & { status?: string; lastRunAt?: Date | null }): Promise<Job | undefined> {
+    const existing = this.jobs.get(id);
+    if (!existing) return undefined;
+
+    const updated: Job = {
+      ...existing,
+      ...job,
+      updatedAt: new Date(),
+    };
+    this.jobs.set(id, updated);
+    return updated;
+  }
+
+  async deleteJob(id: number): Promise<boolean> {
+    return this.jobs.delete(id);
+  }
+
+  private calculateNextRun(config: any): Date {
+    const now = new Date();
+    const interval = config.interval || 'daily';
+    const intervalValue = config.intervalValue || 1;
+
+    switch (interval) {
+      case 'hourly':
+        return new Date(now.getTime() + intervalValue * 60 * 60 * 1000);
+      case 'daily':
+        return new Date(now.getTime() + intervalValue * 24 * 60 * 60 * 1000);
+      case 'weekly':
+        return new Date(now.getTime() + intervalValue * 7 * 24 * 60 * 60 * 1000);
+      case 'monthly':
+        const nextMonth = new Date(now);
+        nextMonth.setMonth(nextMonth.getMonth() + intervalValue);
+        return nextMonth;
+      default:
+        return new Date(now.getTime() + 24 * 60 * 60 * 1000); // Default to 1 day
+    }
   }
 }
 
