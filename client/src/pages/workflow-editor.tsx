@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,7 +37,7 @@ export default function WorkflowEditor() {
   });
 
   // Load workflow data when fetched
-  useState(() => {
+  useEffect(() => {
     if (workflow) {
       const workflowData = workflow.data as WorkflowData;
       setNodes(workflowData.nodes || []);

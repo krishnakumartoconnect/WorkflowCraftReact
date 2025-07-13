@@ -122,6 +122,7 @@ export class MemStorage implements IStorage {
     const newWorkflow: Workflow = {
       ...workflow,
       id,
+      description: workflow.description || null,
       createdAt: now,
       updatedAt: now,
     };

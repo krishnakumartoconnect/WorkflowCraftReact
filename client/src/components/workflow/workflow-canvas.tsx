@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Node,
   Edge,
@@ -37,31 +37,46 @@ export default function WorkflowCanvas({
   onEdgesChange,
   onEditSODPolicy,
 }: WorkflowCanvasProps) {
-  const [reactFlowNodes, setReactFlowNodes, onNodesChangeInternal] = useNodesState(nodes);
-  const [reactFlowEdges, setReactFlowEdges, onEdgesChangeInternal] = useEdgesState(edges);
+  const [reactFlowNodes, setReactFlowNodes, onNodesChangeInternal] = useNodesState([]);
+  const [reactFlowEdges, setReactFlowEdges, onEdgesChangeInternal] = useEdgesState([]);
+
+  // Sync nodes and edges with parent state
+  useEffect(() => {
+    setReactFlowNodes(nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        onEditSODPolicy,
+      },
+    })));
+  }, [nodes, onEditSODPolicy, setReactFlowNodes]);
+
+  useEffect(() => {
+    setReactFlowEdges(edges);
+  }, [edges, setReactFlowEdges]);
 
   // Update parent when internal state changes
   const handleNodesChange: OnNodesChange = useCallback((changes) => {
     onNodesChangeInternal(changes);
-    // Update parent with new nodes after state change
-    setImmediate(() => {
+    // Notify parent of changes
+    setTimeout(() => {
       setReactFlowNodes(current => {
         onNodesChange(current);
         return current;
       });
-    });
-  }, [onNodesChangeInternal, onNodesChange]);
+    }, 0);
+  }, [onNodesChangeInternal, onNodesChange, setReactFlowNodes]);
 
   const handleEdgesChange: OnEdgesChange = useCallback((changes) => {
     onEdgesChangeInternal(changes);
-    // Update parent with new edges after state change
-    setImmediate(() => {
+    // Notify parent of changes
+    setTimeout(() => {
       setReactFlowEdges(current => {
         onEdgesChange(current);
         return current;
       });
-    });
-  }, [onEdgesChangeInternal, onEdgesChange]);
+    }, 0);
+  }, [onEdgesChangeInternal, onEdgesChange, setReactFlowEdges]);
 
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
@@ -117,21 +132,7 @@ export default function WorkflowCanvas({
     [setReactFlowNodes, onNodesChange, onEditSODPolicy]
   );
 
-  // Update nodes when props change
-  useState(() => {
-    setReactFlowNodes(nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        onEditSODPolicy,
-      },
-    })));
-  }, [nodes, onEditSODPolicy]);
 
-  // Update edges when props change
-  useState(() => {
-    setReactFlowEdges(edges);
-  }, [edges]);
 
   return (
     <div className="flex-1 relative workflow-canvas">
